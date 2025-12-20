@@ -2,7 +2,8 @@ services:
   onlyoffice-documentserver:
     build:
       context: .
+      dockerfile: Dockerfile.ubuntu
+      #dockerfile: Dockerfile.debian
     container_name: onlyoffice-documentserver
     ports:
       - '80:80'
-      - '8000:8000'

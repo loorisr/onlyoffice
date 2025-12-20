@@ -1,0 +1,74 @@
+ARG BASE_VERSION=24.04
+
+ARG BASE_IMAGE=ubuntu:$BASE_VERSION
+
+FROM ${BASE_IMAGE} AS documentserver
+
+ARG BASE_VERSION
+ARG PG_VERSION=16
+
+ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 DEBIAN_FRONTEND=noninteractive PG_VERSION=${PG_VERSION} BASE_VERSION=${BASE_VERSION}
+
+COPY fonts/ /usr/share/fonts/truetype/
+
+RUN echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d && \
+    apt-get -y update && \
+    apt-get -yq install locales && \
+    apt-get -y update && \
+    locale-gen en_US.UTF-8 && \
+    echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections && \
+    ACCEPT_EULA=Y apt-get -yq install \
+        netcat-openbsd \
+        nginx-extras \
+        postgresql \
+        postgresql-client \
+        pwgen \
+        rabbitmq-server \
+        sudo \
+        supervisor \
+        ttf-mscorefonts-installer --no-install-recommends && \
+    if [  $(find /usr/share/fonts/truetype/msttcorefonts -maxdepth 1 -type f -iname '*.ttf' | wc -l) -lt 30 ]; \
+        then echo 'msttcorefonts failed to download'; exit 1; fi  && \
+    echo "SERVER_ADDITIONAL_ERL_ARGS=\"+S 1:1\"" | tee -a /etc/rabbitmq/rabbitmq-env.conf && \
+    sed 's|\(application\/zip.*\)|\1\n    application\/wasm wasm;|' -i /etc/nginx/mime.types && \
+    pg_conftool $PG_VERSION main set listen_addresses 'localhost' && \
+    service postgresql restart && \
+    sudo -u postgres psql -c "CREATE USER onlyoffice WITH password 'onlyoffice';" && \
+    sudo -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;" && \
+    service postgresql stop && \
+    service rabbitmq-server stop && \
+    service supervisor stop && \
+    service nginx stop && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY config/supervisor/supervisor /etc/init.d/
+COPY config/supervisor/ds/*.conf /etc/supervisor/conf.d/
+COPY run-document-server.sh /app/ds/run-document-server.sh
+
+EXPOSE 80
+
+ARG TARGETARCH
+ARG PACKAGE_BASEURL="http://download.onlyoffice.com/install/documentserver/linux"
+
+ENV COMPANY_NAME=onlyoffice \
+    PRODUCT_NAME=documentserver \
+    DS_PLUGIN_INSTALLATION=false \
+    DS_DOCKER_INSTALLATION=true
+
+RUN PACKAGE_FILE="onlyoffice-documentserver_${TARGETARCH:-$(dpkg --print-architecture)}.deb" && \
+    wget -q -P /tmp "$PACKAGE_BASEURL/$PACKAGE_FILE" && \
+    apt-get -y update && \
+    service postgresql start && \
+    apt-get -yq install /tmp/$PACKAGE_FILE && \
+    PGPASSWORD=onlyoffice dropdb -h localhost -p 5432 -U onlyoffice onlyoffice && \
+    sudo -u postgres psql -c "DROP ROLE onlyoffice;" && \
+    service postgresql stop && \
+    chmod 755 /etc/init.d/supervisor && \
+    sed "s/COMPANY_NAME/onlyoffice/g" -i /etc/supervisor/conf.d/*.conf && \
+    service supervisor stop && \
+    chmod 755 /app/ds/*.sh && \
+    rm -f /tmp/$PACKAGE_FILE && \
+    rm -rf /var/log/onlyoffice && \
+    rm -rf /var/lib/apt/lists/*
+
+ENTRYPOINT ["/app/ds/run-document-server.sh"]
