@@ -9,7 +9,7 @@ ARG PG_VERSION=17
 
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 DEBIAN_FRONTEND=noninteractive PG_VERSION=${PG_VERSION} BASE_VERSION=${BASE_VERSION}
 
-COPY fonts/ /usr/share/fonts/truetype/
+#COPY fonts/ /usr/share/fonts/truetype/
 
 RUN echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d && \
     sed -i 's/Components: main/Components: main contrib/' /etc/apt/sources.list.d/debian.sources && \
