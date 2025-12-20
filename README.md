@@ -1,4 +1,4 @@
-# onlyoffice
+# OnlyOffice docker
 Clean onlyoffice document server docker : https://github.com/ONLYOFFICE/Docker-DocumentServer/
 
 Images available at: https://hub.docker.com/r/loorisr/onlyoffice
