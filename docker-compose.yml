@@ -1,0 +1,8 @@
+services:
+  onlyoffice-documentserver:
+    build:
+      context: .
+    container_name: onlyoffice-documentserver
+    ports:
+      - '80:80'
+      - '8000:8000'
