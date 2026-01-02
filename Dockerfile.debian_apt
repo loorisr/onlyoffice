@@ -5,8 +5,8 @@ ENV DEBIAN_FRONTEND=noninteractive PG_VERSION=17
 RUN echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d && \
     sed -i 's/Components: main/Components: main contrib/' /etc/apt/sources.list.d/debian.sources && \
     echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections && \
-    apt-get -y update && \
-    ACCEPT_EULA=Y apt-get -yq install \
+    apt -y update && \
+    ACCEPT_EULA=Y apt -yq install \
         netcat-openbsd \
         nginx-extras \
         postgresql \
@@ -14,6 +14,7 @@ RUN echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d && \
         pwgen \
         cron \
         rabbitmq-server \
+        gnupg2 \
         sudo \
         supervisor \
         ttf-mscorefonts-installer --no-install-recommends && \
@@ -33,30 +34,29 @@ COPY config/supervisor/supervisor /etc/init.d/
 COPY config/supervisor/ds/*.conf /etc/supervisor/conf.d/
 COPY run-document-server.sh /app/ds/run-document-server.sh
 
-EXPOSE 80
-
-ARG TARGETARCH
-ARG PACKAGE_BASEURL="https://download.onlyoffice.com/install/documentserver/linux"
-
 ENV COMPANY_NAME=onlyoffice \
     PRODUCT_NAME=documentserver \
     DS_PLUGIN_INSTALLATION=false \
     DS_DOCKER_INSTALLATION=true
 
-RUN PACKAGE_FILE="onlyoffice-documentserver_${TARGETARCH:-$(dpkg --print-architecture)}.deb" && \
-    wget -q -P /tmp "$PACKAGE_BASEURL/$PACKAGE_FILE" && \
-    apt-get -y update && \
+RUN echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list && \
+    wget -qO- https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | gpg --dearmor | sudo tee /usr/share/keyrings/onlyoffice.gpg && \
+    apt -y update && \
     service postgresql start && \
-    apt-get -yq install /tmp/$PACKAGE_FILE && \
-    PGPASSWORD=onlyoffice dropdb -h localhost -p 5432 -U onlyoffice onlyoffice && \
-    sudo -u postgres psql -c "DROP ROLE onlyoffice;" && \
+    apt -yq install onlyoffice-documentserver && \
+    PGPASSWORD=onlyoffice  && \ 
+    # dropdb -h localhost -p 5432 -U onlyoffice onlyoffice && \
+ #   sudo -u postgres psql -c "DROP ROLE onlyoffice;" && \
+    apt remove -yq postgresql-client gnupg2 && \
+    apt -yq clean && \
     service postgresql stop && \
     chmod 755 /etc/init.d/supervisor && \
     sed "s/COMPANY_NAME/onlyoffice/g" -i /etc/supervisor/conf.d/*.conf && \
     service supervisor stop && \
     chmod 755 /app/ds/*.sh && \
-    rm -f /tmp/$PACKAGE_FILE && \
     rm -rf /var/log/onlyoffice && \
     rm -rf /var/lib/apt/lists/*
+
+EXPOSE 80
 
 ENTRYPOINT ["/app/ds/run-document-server.sh"]
