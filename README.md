@@ -15,6 +15,6 @@ or **Debian**
     PostgreSQL 17.6
     RabbitMQ 4.0.5
 
-Size
-- compressed is 1.19 vs 1.53 Go (-22%)
-- uncompressed is 2.82 vs 3.67 go (-23%)
+Size (debian)
+- compressed is 1.13 vs 1.53 Go (-26%)
+- uncompressed is 2.6 vs 3.67 go (-29%)
