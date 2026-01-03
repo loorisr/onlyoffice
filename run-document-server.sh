@@ -21,15 +21,15 @@ trap clean_exit SIGTERM SIGQUIT SIGABRT SIGINT
 # Define '**' behavior explicitly
 shopt -s globstar
 
-APP_DIR="/var/www/${COMPANY_NAME}/documentserver"
-DATA_DIR="/var/www/${COMPANY_NAME}/Data"
+APP_DIR="/var/www/onlyoffice/documentserver"
+DATA_DIR="/var/www/onlyoffice/Data"
 PRIVATE_DATA_DIR="${DATA_DIR}/.private"
 DS_RELEASE_DATE="${PRIVATE_DATA_DIR}/ds_release_date"
-LOG_DIR="/var/log/${COMPANY_NAME}"
+LOG_DIR="/var/log/onlyoffice"
 DS_LOG_DIR="${LOG_DIR}/documentserver"
-LIB_DIR="/var/lib/${COMPANY_NAME}"
+LIB_DIR="/var/lib/onlyoffice"
 DS_LIB_DIR="${LIB_DIR}/documentserver"
-CONF_DIR="/etc/${COMPANY_NAME}/documentserver"
+CONF_DIR="/etc/onlyoffice/documentserver"
 SUPERVISOR_CONF_DIR="/etc/supervisor/conf.d"
 IS_UPGRADE="false"
 PLUGINS_ENABLED=${PLUGINS_ENABLED:-true}
@@ -58,13 +58,13 @@ if find "${SSL_CERTIFICATES_DIR}" -maxdepth 1 -type f | read _; then
   find "${SSL_CERTIFICATES_DIR}" -type f -iname '*.key' -exec chmod 400 {} \;
 fi
 
-if [[ -z $SSL_CERTIFICATE_PATH ]] && [[ -f ${SSL_CERTIFICATES_DIR}/${COMPANY_NAME}.crt ]]; then
-  SSL_CERTIFICATE_PATH=${SSL_CERTIFICATES_DIR}/${COMPANY_NAME}.crt
+if [[ -z $SSL_CERTIFICATE_PATH ]] && [[ -f ${SSL_CERTIFICATES_DIR}/onlyoffice.crt ]]; then
+  SSL_CERTIFICATE_PATH=${SSL_CERTIFICATES_DIR}/onlyoffice.crt
 else
   SSL_CERTIFICATE_PATH=${SSL_CERTIFICATE_PATH:-${SSL_CERTIFICATES_DIR}/tls.crt}
 fi
-if [[ -z $SSL_KEY_PATH ]] && [[ -f ${SSL_CERTIFICATES_DIR}/${COMPANY_NAME}.key ]]; then
-  SSL_KEY_PATH=${SSL_CERTIFICATES_DIR}/${COMPANY_NAME}.key
+if [[ -z $SSL_KEY_PATH ]] && [[ -f ${SSL_CERTIFICATES_DIR}/onlyoffice.key ]]; then
+  SSL_KEY_PATH=${SSL_CERTIFICATES_DIR}/onlyoffice.key
 else
   SSL_KEY_PATH=${SSL_KEY_PATH:-${SSL_CERTIFICATES_DIR}/tls.key}
 fi
@@ -130,12 +130,6 @@ ALLOW_PRIVATE_IP_ADDRESS=${ALLOW_PRIVATE_IP_ADDRESS:-false}
 
 GENERATE_FONTS=${GENERATE_FONTS:-true}
 
-if [[ ${PRODUCT_NAME}${PRODUCT_EDITION} == "documentserver" ]]; then
-  REDIS_ENABLED=false
-else
-  REDIS_ENABLED=true
-fi
-
 ONLYOFFICE_DEFAULT_CONFIG=${CONF_DIR}/local.json
 ONLYOFFICE_LOG4JS_CONFIG=${CONF_DIR}/log4js/production.json
 ONLYOFFICE_EXAMPLE_CONFIG=${CONF_DIR}-example/local.json
@@ -180,18 +174,6 @@ read_setting(){
   case $DB_TYPE in
     "postgres")
       DB_PORT=${DB_PORT:-"5432"}
-      ;;
-    "mariadb"|"mysql")
-      DB_PORT=${DB_PORT:-"3306"}
-      ;;
-    "dameng")
-      DB_PORT=${DB_PORT:-"5236"}
-      ;;
-    "mssql")
-      DB_PORT=${DB_PORT:-"1433"}
-      ;;
-    "oracle")
-      DB_PORT=${DB_PORT:-"1521"}
       ;;
     "")
       DB_PORT=${DB_PORT:-${POSTGRESQL_SERVER_PORT:-$(${JSON} services.CoAuthoring.sql.dbPort)}}
@@ -456,37 +438,11 @@ create_mssql_db(){
 }
 
 create_db_tbl() {
-  case $DB_TYPE in
-    "postgres")
-      create_postgresql_tbl
-    ;;
-    "mariadb"|"mysql")
-      create_mysql_tbl
-    ;;
-    "mssql")
-      create_mssql_tbl
-    ;;
-    "oracle")
-      create_oracle_tbl
-    ;;
-  esac
+  create_postgresql_tbl
 }
 
 upgrade_db_tbl() {
-  case $DB_TYPE in
-    "postgres")
-      upgrade_postgresql_tbl
-    ;;
-    "mariadb"|"mysql")
-      upgrade_mysql_tbl
-    ;;
-    "mssql")
-      upgrade_mssql_tbl
-    ;;
-    "oracle")
-      upgrade_oracle_tbl
-    ;;
-  esac
+  upgrade_postgresql_tbl
 }
 
 postgresql_check_schema(){
@@ -517,32 +473,6 @@ upgrade_postgresql_tbl() {
   $PSQL -f "$APP_DIR/server/schema/postgresql/createdb.sql"
 }
 
-upgrade_mysql_tbl() {
-  CONNECTION_PARAMS="-h$DB_HOST -P$DB_PORT -u$DB_USER -p$DB_PWD -w"
-  MYSQL="mysql -q $CONNECTION_PARAMS"
-
-  $MYSQL $DB_NAME < "$APP_DIR/server/schema/mysql/removetbl.sql" >/dev/null 2>&1
-  $MYSQL $DB_NAME < "$APP_DIR/server/schema/mysql/createdb.sql" >/dev/null 2>&1
-}
-
-upgrade_mssql_tbl() {
-  if [ -n "$DB_PWD" ]; then
-    export SQLCMDPASSWORD=$DB_PWD
-  fi
-
-  MSSQL="/opt/mssql-tools18/bin/sqlcmd -S $DB_HOST,$DB_PORT -d $DB_NAME -U $DB_USER -C"
-
-  mssql_check_schema
-  $MSSQL < "$APP_DIR/server/schema/mssql/removetbl.sql" >/dev/null 2>&1
-  $MSSQL < "$APP_DIR/server/schema/mssql/createdb.sql" >/dev/null 2>&1
-}
-
-upgrade_oracle_tbl() {
-  ORACLE_SQL="sqlplus $DB_USER/$DB_PWD@//$DB_HOST:$DB_PORT/${DB_NAME}"
-
-  $ORACLE_SQL @$APP_DIR/server/schema/oracle/removetbl.sql >/dev/null 2>&1
-  $ORACLE_SQL @$APP_DIR/server/schema/oracle/createdb.sql >/dev/null 2>&1
-}
 
 create_postgresql_tbl() {
   if [ -n "$DB_PWD" ]; then
@@ -555,33 +485,6 @@ create_postgresql_tbl() {
   $PSQL -f "$APP_DIR/server/schema/postgresql/createdb.sql"
 }
 
-create_mysql_tbl() {
-  CONNECTION_PARAMS="-h$DB_HOST -P$DB_PORT -u$DB_USER -p$DB_PWD -w"
-  MYSQL="mysql -q $CONNECTION_PARAMS"
-
-  # Create db on remote server
-  $MYSQL -e "CREATE DATABASE IF NOT EXISTS $DB_NAME DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;" >/dev/null 2>&1
-
-  $MYSQL $DB_NAME < "$APP_DIR/server/schema/mysql/createdb.sql" >/dev/null 2>&1
-}
-
-create_mssql_tbl() {  
-  if [ -n "$DB_PWD" ]; then
-    export SQLCMDPASSWORD=$DB_PWD
-  fi
-
-  MSSQL="/opt/mssql-tools18/bin/sqlcmd -S $DB_HOST,$DB_PORT -d $DB_NAME -U $DB_USER -C"
-
-  create_mssql_db
-  mssql_check_schema
-  $MSSQL < "$APP_DIR/server/schema/mssql/createdb.sql" >/dev/null 2>&1
-}
-
-create_oracle_tbl() {
-  ORACLE_SQL="sqlplus $DB_USER/$DB_PWD@//$DB_HOST:$DB_PORT/${DB_NAME}"
-
-  $ORACLE_SQL @$APP_DIR/server/schema/oracle/createdb.sql >/dev/null 2>&1
-}
 
 update_welcome_page() {
   WELCOME_PAGE="${APP_DIR}-example/welcome/docker.html"
@@ -743,17 +646,6 @@ if [ ${ONLYOFFICE_DATA_CONTAINER_HOST} = "localhost" ]; then
     rm -rf /var/run/rabbitmq
   fi
 
-  if [ ${REDIS_ENABLED} = "true" ]; then
-    if [ ${REDIS_SERVER_HOST} != "localhost" ]; then
-      update_redis_settings
-    else
-      # change rights for redis directory
-      chown -R redis:redis ${REDIS_DATA}
-      chmod -R 750 ${REDIS_DATA}
-
-      LOCAL_SERVICES+=("redis-server")
-    fi
-  fi
 else
   # no need to update settings just wait for remote data
   waiting_for_datacontainer
@@ -765,7 +657,7 @@ else
   update_welcome_page
 fi
 
-find /etc/${COMPANY_NAME} ! -path '*logrotate*' -exec chown ds:ds {} \;
+find /etc/onlyoffice ! -path '*logrotate*' -exec chown ds:ds {} \;
 
 #start needed local services
 for i in ${LOCAL_SERVICES[@]}; do
@@ -781,9 +673,6 @@ fi
 if [ ${ONLYOFFICE_DATA_CONTAINER} != "true" ]; then
   waiting_for_db
   waiting_for_amqp
-  if [ ${REDIS_ENABLED} = "true" ]; then
-    waiting_for_redis
-  fi
 
   if [ "${IS_UPGRADE}" = "true" ]; then
     upgrade_db_tbl
