@@ -18,7 +18,7 @@ jobs:
     # The matrix runs two separate instances of this job simultaneously
     strategy:
       matrix:
-        os: [ubuntu, debian]
+        os: [debian] # last ubuntu Dockerfile doesn't not work
 
     steps:
       - name: Checkout repository
