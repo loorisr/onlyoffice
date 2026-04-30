@@ -1,0 +1,21 @@
+name: Cleanup Old Docker Images
+
+on:
+ # schedule:
+    # Runs at 00:00 every Sunday (optional, but keeps things tidy automatically)
+    #- cron: '0 0 * * 0'
+  workflow_dispatch: # Allows you to run this manually from the Actions tab
+
+jobs:
+  delete-old-versions:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Delete old image versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'onlyoffice'
+          package-type: 'container'
+          min-versions-to-keep: 2
