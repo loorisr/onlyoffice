@@ -1,3 +1,8 @@
+*outdated*
+
+*since v9.4, Onlyoffice is released without postgresql, redis and rabbitmq. Size is equivalent and official release has less vulnerabilities.*
+
+
 # OnlyOffice docker
 Clean onlyoffice document server docker : https://github.com/ONLYOFFICE/Docker-DocumentServer/
 
